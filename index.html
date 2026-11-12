@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d4ed8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Clinical Atlas">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Clinical Atlas | أطلس العينات المجهرية</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = { theme: { extend: { fontFamily: { sans: ['Cairo','sans-serif'] },
+    colors: { brand: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',900:'#1e3a8a' } } } } }
+</script>
+<style>
+  body { font-family:'Cairo',sans-serif; background:#f1f5f9; -webkit-tap-highlight-color:transparent; }
+  .field { width:100%; border:1.5px solid #e2e8f0; background:#fff; border-radius:.75rem; padding:.65rem .8rem; font-size:1rem; outline:none; transition:.15s; }
+  .field:focus { border-color:#3b82f6; box-shadow:0 0 0 3px #dbeafe; }
+  .lbl { display:block; font-size:.8rem; font-weight:700; color:#475569; margin-bottom:.3rem; }
+  .sig { font-family:'Aref Ruqaa',serif; }
+  .tab-active { color:#1d4ed8; }
+  .tab-active .tab-bar { background:#1d4ed8; }
+  #printArea { display:none; }
+  .toast { position:fixed; bottom:5.5rem; left:50%; transform:translateX(-50%) translateY(20px); opacity:0; transition:.25s; z-index:120; pointer-events:none; max-width:92vw; text-align:center; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .tool { background:#334155; color:#fff; border-radius:.6rem; padding:.5rem .2rem; font-size:.75rem; font-weight:700; }
+  .tool.on { background:#2563eb; }
+
+  /* ===== Booklet (print) ===== */
+  .bk-page { width:210mm; height:297mm; box-sizing:border-box; padding:14mm 16mm; position:relative; background:#fff; color:#0f172a; page-break-after:always; break-after:page; overflow:hidden; display:flex; flex-direction:column; }
+  .bk-page:last-child { page-break-after:auto; break-after:auto; }
+  .bk-head { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #1d4ed8; padding-bottom:3mm; font-size:10pt; color:#1d4ed8; font-weight:700; }
+  .bk-foot { position:absolute; bottom:8mm; left:16mm; right:16mm; display:flex; justify-content:space-between; font-size:8.5pt; color:#64748b; border-top:1px solid #cbd5e1; padding-top:2mm; }
+  .bk-cover { justify-content:center; align-items:center; text-align:center; background:linear-gradient(160deg,#1e3a8a 0%,#2563eb 60%,#60a5fa 100%); color:#fff; }
+  .bk-cover h1 { font-size:34pt; font-weight:800; margin:6mm 0 2mm; }
+  .bk-cover .en { font-size:18pt; letter-spacing:3px; opacity:.9; }
+  .bk-cover .inst { margin-top:14mm; font-size:15pt; font-weight:600; }
+  .bk-cover .meta { margin-top:5mm; font-size:11pt; opacity:.85; }
+  .bk-ring { width:34mm; height:34mm; border:2.5mm solid rgba(255,255,255,.85); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:22pt; }
+  .bk-logo { background:#fff; border-radius:5mm; padding:4mm; max-width:60mm; max-height:40mm; display:flex; align-items:center; justify-content:center; }
+  .bk-logo img { max-width:100%; max-height:32mm; object-fit:contain; }
+  .bk-toc h2, .bk-sum h2 { font-size:20pt; color:#1d4ed8; margin:8mm 0 6mm; font-weight:800; }
+  .bk-toc .row { display:flex; align-items:baseline; gap:3mm; padding:2.5mm 0; border-bottom:1px dotted #94a3b8; font-size:12pt; }
+  .bk-toc .row .dots { flex:1; }
+  .bk-chapter { display:inline-block; background:#dbeafe; color:#1e3a8a; border-radius:3mm; padding:1mm 4mm; font-weight:700; font-size:10.5pt; }
+  .bk-img { margin-top:5mm; border:1px solid #cbd5e1; border-radius:3mm; background:#0f172a; height:112mm; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .bk-img img { max-width:100%; max-height:100%; object-fit:contain; }
+  .bk-noimg { color:#94a3b8; font-size:12pt; }
+  .bk-table { width:100%; border-collapse:collapse; margin-top:4mm; font-size:10.5pt; }
+  .bk-table td { border:1px solid #e2e8f0; padding:2mm 3mm; }
+  .bk-table td.k { background:#eff6ff; color:#1e3a8a; font-weight:700; width:20%; }
+  .bk-comment { margin-top:3mm; border-right:1.2mm solid #2563eb; background:#f8fafc; padding:3mm 4mm; font-size:10.5pt; line-height:1.7; min-height:16mm; }
+  .bk-tags { margin-top:2mm; font-size:9pt; color:#2563eb; }
+  .bk-sign { margin-top:auto; margin-bottom:14mm; display:flex; justify-content:flex-start; }
+  .bk-sign .box { min-width:62mm; text-align:center; }
+  .bk-sign .name { font-family:'Aref Ruqaa',serif; font-size:17pt; color:#1e3a8a; border-bottom:1.2px solid #1e293b; padding:0 4mm 1mm; min-height:10mm; }
+  .bk-sign .cap { font-size:8.5pt; color:#64748b; margin-top:1mm; }
+  /* 4-up grid */
+  .bk-grid { flex:1; margin-top:4mm; margin-bottom:11mm; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:4mm; min-height:0; }
+  .bk-cell { border:1px solid #cbd5e1; border-radius:3mm; padding:2.2mm; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .bk-cell .ct { display:flex; justify-content:space-between; align-items:center; font-size:8pt; color:#475569; margin-bottom:1.5mm; }
+  .bk-cell .ct b { background:#dbeafe; color:#1e3a8a; border-radius:2mm; padding:.3mm 2mm; font-size:8.5pt; }
+  .bk-cell .ci { flex:1; min-height:0; background:#0f172a; border-radius:2mm; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .bk-cell .ci img { max-width:100%; max-height:100%; object-fit:contain; }
+  .bk-cell .cf { font-size:8pt; line-height:1.5; margin-top:1.5mm; color:#1e293b; }
+  .bk-cell .cf .cm { color:#475569; max-height:10mm; overflow:hidden; }
+  .bk-cell .cs { font-family:'Aref Ruqaa',serif; font-size:11pt; color:#1e3a8a; border-top:1px solid #1e293b; margin-top:1.5mm; padding-top:.5mm; text-align:center; }
+  .bk-sum table { width:100%; border-collapse:collapse; font-size:11pt; margin-bottom:6mm; }
+  .bk-sum th { background:#1d4ed8; color:#fff; padding:2mm 3mm; text-align:right; }
+  .bk-sum td { border:1px solid #e2e8f0; padding:2mm 3mm; }
+  .bk-sum h3 { color:#1e3a8a; font-size:13pt; margin:4mm 0 2mm; }
+
+  @media print {
+    @page { size:A4; margin:0; }
+    html, body { background:#fff !important; }
+    #app, .toast, #modalRoot, #editorRoot, nav { display:none !important; }
+    #printArea { display:block !important; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body class="text-slate-800">
+
+<div id="app" class="max-w-xl mx-auto min-h-screen pb-28">
+
+  <header class="sticky top-0 z-30 bg-gradient-to-l from-brand-700 to-brand-500 text-white shadow-md">
+    <div class="px-4 py-3 flex items-center justify-between" style="padding-top:max(.75rem, env(safe-area-inset-top))">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl">🔬</div>
+        <div>
+          <h1 class="font-extrabold leading-tight text-lg">Clinical Atlas</h1>
+          <p class="text-[11px] text-brand-100 leading-tight">أرشفة العينات المجهرية والكتيبات الطبية</p>
+        </div>
+      </div>
+      <div class="text-center bg-white/15 rounded-xl px-3 py-1">
+        <div id="statCount" class="font-extrabold text-lg leading-none">0</div>
+        <div class="text-[10px] text-brand-100">سجل</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== Add ===== -->
+  <section id="tab-add" class="px-4 pt-4">
+    <form id="form" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-4" autocomplete="off">
+      <div class="flex items-center justify-between">
+        <h2 id="formTitle" class="font-extrabold text-brand-900 text-base">➕ إضافة عينة جديدة</h2>
+        <button type="button" id="cancelEdit" class="hidden text-xs font-bold text-rose-600 bg-rose-50 rounded-lg px-3 py-1">إلغاء التعديل</button>
+      </div>
+
+      <div>
+        <span class="lbl">صورة العينة (Microscopic Image)</span>
+        <div class="relative rounded-xl border-2 border-dashed border-brand-200 bg-brand-50 h-52 flex items-center justify-center overflow-hidden">
+          <div id="previewEmpty" class="text-center text-slate-400">
+            <div class="text-4xl">🖼️</div>
+            <div class="text-xs mt-1">لم يتم اختيار صورة بعد</div>
+          </div>
+          <img id="previewImg" class="hidden w-full h-full object-contain bg-slate-900" alt="">
+          <button type="button" id="removeImg" class="hidden absolute top-2 left-2 bg-rose-600 text-white text-xs font-bold rounded-lg px-2 py-1 shadow">حذف الصورة</button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <label class="cursor-pointer bg-brand-600 active:bg-brand-700 text-white text-center font-bold rounded-xl py-3 text-sm">
+            📷 التقاط بالكاميرا
+            <input id="inCamera" type="file" accept="image/*" capture="environment" class="hidden">
+          </label>
+          <label class="cursor-pointer bg-white border-2 border-brand-600 text-brand-700 text-center font-bold rounded-xl py-3 text-sm">
+            🖼️ من المعرض
+            <input id="inGallery" type="file" accept="image/*" class="hidden">
+          </label>
+        </div>
+        <button type="button" id="editImgBtn" class="hidden w-full mt-2 bg-amber-100 text-amber-800 font-bold rounded-xl py-2.5 text-sm">🖍️ تحرير الصورة (قص، تدوير، أسهم، تعليقات)</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2">
+          <label class="lbl" for="pid">رقم المريض (Patient ID)</label>
+          <input id="pid" class="field" required placeholder="مثال: P-1024" dir="ltr" style="text-align:right">
+        </div>
+        <div>
+          <label class="lbl" for="gender">الجنس (Gender)</label>
+          <select id="gender" class="field" required>
+            <option value="">اختر...</option>
+            <option value="ذكر">ذكر (Male)</option>
+            <option value="أنثى">أنثى (Female)</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl" for="age">العمر (Age)</label>
+          <input id="age" type="number" min="0" max="130" inputmode="numeric" class="field" required placeholder="بالسنوات">
+        </div>
+        <div>
+          <label class="lbl" for="sample">نوع العينة (Sample)</label>
+          <select id="sample" class="field" required></select>
+        </div>
+        <div>
+          <label class="lbl" for="diag">التشخيص (Diagnostic)</label>
+          <select id="diag" class="field" required></select>
+        </div>
+        <div class="col-span-2">
+          <label class="lbl" for="organism">الاسم العلمي / التشخيص النهائي</label>
+          <input id="organism" class="field" dir="ltr" style="text-align:right" placeholder="e.g. Entamoeba histolytica">
+        </div>
+        <div>
+          <label class="lbl" for="mag">قوة التكبير</label>
+          <select id="mag" class="field"></select>
+        </div>
+        <div>
+          <label class="lbl" for="stain">نوع الصبغة</label>
+          <select id="stain" class="field"></select>
+        </div>
+        <div class="col-span-2">
+          <label class="lbl" for="date">تاريخ الفحص</label>
+          <input id="date" type="date" class="field" required>
+        </div>
+        <div class="col-span-2">
+          <label class="lbl" for="tags">وسوم (Tags) — افصل بينها بفاصلة</label>
+          <input id="tags" class="field" placeholder="مثال: دوسنتاريا, أطفال, حالة نادرة">
+        </div>
+        <div class="col-span-2">
+          <label class="lbl" for="comment">ملاحظات / تعليق سريري (Comment)</label>
+          <textarea id="comment" rows="3" class="field" placeholder="الوصف المجهري، الملاحظات..."></textarea>
+        </div>
+        <div class="col-span-2">
+          <label class="lbl" for="sign">✍️ توقيع / اسم الفاحص أو صاحب الصورة</label>
+          <input id="sign" class="field sig text-lg" required placeholder="اكتب الاسم الذي سيظهر كتوقيع">
+        </div>
+      </div>
+
+      <button id="saveBtn" type="submit" class="w-full bg-gradient-to-l from-brand-700 to-brand-500 text-white font-extrabold rounded-xl py-3.5 text-base shadow-md active:scale-[.98] transition">💾 حفظ السجل</button>
+    </form>
+  </section>
+
+  <!-- ===== List ===== -->
+  <section id="tab-list" class="px-4 pt-4 hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 space-y-2 sticky top-[68px] z-20">
+      <input id="q" class="field" placeholder="🔍 بحث: رقم، وسم، تعليق، فاحص...">
+      <div class="grid grid-cols-2 gap-2">
+        <select id="fSample" class="field text-sm"></select>
+        <select id="fDiag" class="field text-sm"></select>
+      </div>
+      <div class="flex items-center justify-between text-xs text-slate-500 px-1">
+        <span id="resultInfo"></span>
+        <button id="clearFilters" type="button" class="text-brand-700 font-bold">مسح الفلاتر</button>
+      </div>
+    </div>
+    <div id="cards" class="mt-3 space-y-3"></div>
+    <div id="emptyState" class="hidden text-center py-14 text-slate-400">
+      <div class="text-5xl mb-2">🧫</div>
+      <p class="font-bold">لا توجد سجلات مطابقة</p>
+      <p class="text-xs mt-1">أضف عينة جديدة من تبويب «إضافة»</p>
+    </div>
+  </section>
+
+  <!-- ===== Booklet ===== -->
+  <section id="tab-book" class="px-4 pt-4 hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-4">
+      <h2 class="font-extrabold text-brand-900">📘 إصدار كتيب العينات</h2>
+      <div>
+        <label class="lbl" for="bkTitle">عنوان الكتيب</label>
+        <input id="bkTitle" class="field" value="أطلس العينات المجهرية">
+      </div>
+      <div>
+        <label class="lbl" for="bkInst">المؤسسة / المختبر</label>
+        <input id="bkInst" class="field" placeholder="اختياري">
+      </div>
+      <div>
+        <span class="lbl">شعار المؤسسة (يظهر على الغلاف)</span>
+        <div class="flex items-center gap-2">
+          <div id="logoBox" class="w-16 h-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden text-slate-300 text-2xl">🏛️</div>
+          <label class="flex-1 text-center cursor-pointer bg-slate-100 font-bold rounded-xl py-2.5 text-sm">رفع شعار
+            <input id="logoIn" type="file" accept="image/*" class="hidden">
+          </label>
+          <button id="logoDel" type="button" class="bg-rose-50 text-rose-600 font-bold rounded-xl px-3 py-2.5 text-sm">حذف</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="lbl" for="bkGroup">الفصول حسب</label>
+          <select id="bkGroup" class="field text-sm">
+            <option value="sample">نوع العينة</option>
+            <option value="diag">الفئة التشخيصية</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl" for="bkLayout">تخطيط الصفحة</label>
+          <select id="bkLayout" class="field text-sm">
+            <option value="1">حالة واحدة / صفحة</option>
+            <option value="4">4 حالات / صفحة</option>
+          </select>
+        </div>
+      </div>
+      <label class="flex items-start gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+        <input id="bkAnon" type="checkbox" class="w-4 h-4 mt-1 accent-emerald-600" checked>
+        <span><b class="text-emerald-800">إخفاء رقم المريض (موصى به)</b><br><span class="text-xs text-slate-600">يُستبدل برمز حالة مجهول (C-001...). راجع الملاحظات السريرية أيضاً لتتأكد من خلوها من أسماء.</span></span>
+      </label>
+      <label class="flex items-center gap-2 text-sm">
+        <input id="bkFiltered" type="checkbox" class="w-4 h-4 accent-blue-600">
+        <span>تصدير نتائج الفلترة الحالية فقط</span>
+      </label>
+      <button id="exportBtn" class="w-full bg-gradient-to-l from-brand-700 to-brand-500 text-white font-extrabold rounded-xl py-3.5 shadow-md active:scale-[.98] transition">📄 تصدير ككتيب عينات (PDF Book)</button>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-3 space-y-3">
+      <h3 class="font-extrabold text-brand-900 text-sm">🗄️ التخزين والنسخ الاحتياطي</h3>
+      <div id="storageInfo" class="text-xs text-slate-500"></div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="backupBtn" class="bg-slate-100 font-bold rounded-xl py-2.5 text-sm">⬇️ تنزيل نسخة</button>
+        <label class="bg-slate-100 font-bold rounded-xl py-2.5 text-sm text-center cursor-pointer">⬆️ استعادة نسخة
+          <input id="restoreIn" type="file" accept="application/json" class="hidden">
+        </label>
+      </div>
+    </div>
+  </section>
+</div>
+
+<nav class="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,.06)]" style="padding-bottom:env(safe-area-inset-bottom)">
+  <div class="max-w-xl mx-auto grid grid-cols-3">
+    <button data-tab="add" class="tabbtn tab-active relative py-2.5 flex flex-col items-center text-slate-500 text-xs font-bold"><span class="tab-bar absolute top-0 h-[3px] w-10 rounded-b bg-transparent"></span><span class="text-xl">➕</span>إضافة</button>
+    <button data-tab="list" class="tabbtn relative py-2.5 flex flex-col items-center text-slate-500 text-xs font-bold"><span class="tab-bar absolute top-0 h-[3px] w-10 rounded-b bg-transparent"></span><span class="text-xl">🗂️</span>السجلات</button>
+    <button data-tab="book" class="tabbtn relative py-2.5 flex flex-col items-center text-slate-500 text-xs font-bold"><span class="tab-bar absolute top-0 h-[3px] w-10 rounded-b bg-transparent"></span><span class="text-xl">📘</span>الكتيب</button>
+  </div>
+</nav>
+
+<div id="toast" class="toast bg-slate-900 text-white text-sm font-bold rounded-xl px-4 py-2.5 shadow-lg"></div>
+<div id="modalRoot"></div>
+<div id="editorRoot"></div>
+<div id="printArea"></div>
+
+<script>
+(function () {
+  'use strict';
+  const OLD_KEY = 'clinical_atlas_records_v1';
+  const SAMPLES = ['Stool','Urine','Blood','CSF','Sputum','Other'];
+  const SAMPLE_AR = { Stool:'براز', Urine:'بول', Blood:'دم', CSF:'سائل نخاعي', Sputum:'بلغم', Other:'أخرى' };
+  const DIAGS = ['Trophozoite','Cyst','Egg','Crystal','Cast','Bacteria','Parasite','Other'];
+  const DIAG_AR = { Trophozoite:'طور نشط', Cyst:'كيسة', Egg:'بيضة', Crystal:'بلورة', Cast:'اسطوانة', Bacteria:'بكتيريا', Parasite:'طفيلي', Other:'أخرى' };
+  const MAGS = ['','4x','10x','40x','100x (Oil)','400x','1000x'];
+  const STAINS = ['','Unstained / Wet mount','Iodine','Saline','Gram','Giemsa','Leishman','Ziehl-Neelsen (ZN)','Methylene blue','H&E','Other'];
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const sLabel = (v) => `${v} – ${SAMPLE_AR[v] || ''}`;
+  const dLabel = (v) => `${v} – ${DIAG_AR[v] || ''}`;
+  const todayISO = () => new Date().toISOString().slice(0, 10);
+  const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('ar-EG'); } catch (e) { return d || ''; } };
+  const parseTags = (s) => String(s || '').split(/[,،]/).map(t => t.trim()).filter(Boolean);
+
+  let records = [];
+  let settings = { title: 'أطلس العينات المجهرية', inst: '', group: 'sample', layout: '1', anon: true, logo: null };
+  let editingId = null;
+  let imgData = null;
+
+  /* ================= IndexedDB ================= */
+  let db;
+  function openDB() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open('clinical_atlas', 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains('records')) d.createObjectStore('records', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'k' });
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  }
+  function tx(store, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = db.transaction(store, mode);
+      const s = t.objectStore(store);
+      const r = fn(s);
+      t.oncomplete = () => res(r && r.result);
+      t.onerror = t.onabort = () => rej(t.error);
+    });
+  }
+  const dbAll = () => tx('records', 'readonly', s => s.getAll());
+  const dbPut = (rec) => tx('records', 'readwrite', s => s.put(rec));
+  const dbDel = (id) => tx('records', 'readwrite', s => s.delete(id));
+  const setPut = (k, v) => tx('settings', 'readwrite', s => s.put({ k, v }));
+  const setAll = () => tx('settings', 'readonly', s => s.getAll());
+
+  async function saveSettings() {
+    try { for (const k of Object.keys(settings)) await setPut(k, settings[k]); } catch (e) {}
+  }
+
+  async function migrateOld() {
+    try {
+      const raw = localStorage.getItem(OLD_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) {
+        for (const r of arr) if (r && r.id) await dbPut(r);
+        toast(`تم نقل ${arr.length} سجل من التخزين القديم`);
+      }
+      localStorage.removeItem(OLD_KEY);
+    } catch (e) { /* keep old data if migration fails */ }
+  }
+
+  /* ================= UI helpers ================= */
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+  function confirmBox(message, okText, cb) {
+    const root = $('modalRoot');
+    root.innerHTML = `
+      <div class="fixed inset-0 z-[70] bg-slate-900/60 flex items-end sm:items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl">
+          <p class="font-bold text-slate-800 mb-4 leading-relaxed">${esc(message)}</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="mNo" class="bg-slate-100 font-bold rounded-xl py-2.5">إلغاء</button>
+            <button id="mYes" class="bg-rose-600 text-white font-bold rounded-xl py-2.5">${esc(okText)}</button>
+          </div>
+        </div>
+      </div>`;
+    $('mNo').onclick = () => root.innerHTML = '';
+    $('mYes').onclick = () => { root.innerHTML = ''; cb(); };
+  }
+  function viewImage(src) {
+    const root = $('modalRoot');
+    root.innerHTML = `<div class="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-3" id="vw">
+      <button class="absolute top-4 left-4 bg-white/20 text-white rounded-full w-10 h-10 text-xl">✕</button>
+      <img src="${src}" class="max-w-full max-h-full object-contain rounded-lg"></div>`;
+    $('vw').onclick = () => root.innerHTML = '';
+  }
+
+  /* ================= Tabs ================= */
+  function showTab(name) {
+    ['add','list','book'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== name));
+    document.querySelectorAll('.tabbtn').forEach(b => b.classList.toggle('tab-active', b.dataset.tab === name));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (name === 'list') renderList();
+    if (name === 'book') showStorage();
+  }
+  document.querySelectorAll('.tabbtn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+  function fillSelects() {
+    $('sample').innerHTML = '<option value="">اختر...</option>' + SAMPLES.map(s => `<option value="${s}">${sLabel(s)}</option>`).join('');
+    $('diag').innerHTML = '<option value="">اختر...</option>' + DIAGS.map(s => `<option value="${s}">${dLabel(s)}</option>`).join('');
+    $('fSample').innerHTML = '<option value="">كل العينات</option>' + SAMPLES.map(s => `<option value="${s}">${sLabel(s)}</option>`).join('');
+    $('fDiag').innerHTML = '<option value="">كل التشخيصات</option>' + DIAGS.map(s => `<option value="${s}">${dLabel(s)}</option>`).join('');
+    $('mag').innerHTML = MAGS.map(m => `<option value="${m}">${m || '— غير محدد —'}</option>`).join('');
+    $('stain').innerHTML = STAINS.map(m => `<option value="${m}">${m || '— غير محدد —'}</option>`).join('');
+  }
+
+  /* ================= Image ================= */
+  function processImage(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1600;
+        let { width: w, height: h } = img;
+        const r = Math.min(1, MAX / Math.max(w, h));
+        w = Math.round(w * r); h = Math.round(h * r);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        setImage(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => toast('تعذر قراءة الصورة');
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  function setImage(data) {
+    imgData = data;
+    $('previewImg').src = data || '';
+    $('previewImg').classList.toggle('hidden', !data);
+    $('previewEmpty').classList.toggle('hidden', !!data);
+    $('removeImg').classList.toggle('hidden', !data);
+    $('editImgBtn').classList.toggle('hidden', !data);
+  }
+  $('inCamera').addEventListener('change', e => { processImage(e.target.files[0]); e.target.value = ''; });
+  $('inGallery').addEventListener('change', e => { processImage(e.target.files[0]); e.target.value = ''; });
+  $('removeImg').addEventListener('click', () => setImage(null));
+  $('editImgBtn').addEventListener('click', async () => {
+    if (!imgData) return;
+    const stamp = [$('mag').value, $('stain').value].filter(Boolean).join(' • ');
+    const out = await openEditor(imgData, stamp);
+    if (out) setImage(out);
+  });
+
+  /* ================= Image editor (crop / rotate / arrows / text / stamp) ================= */
+  function openEditor(src, stampText) {
+    return new Promise((resolve) => {
+      const root = $('editorRoot');
+      root.innerHTML = `
+      <div class="fixed inset-0 z-[90] bg-slate-900 flex flex-col" dir="rtl">
+        <div class="flex items-center justify-between p-3 text-white">
+          <b>🖍️ تحرير الصورة</b>
+          <div class="flex gap-2">
+            <button id="edCancel" class="bg-slate-600 rounded-lg px-4 py-1.5 text-sm font-bold">إلغاء</button>
+            <button id="edDone" class="bg-emerald-600 rounded-lg px-4 py-1.5 text-sm font-bold">تم ✓</button>
+          </div>
+        </div>
+        <div class="flex-1 min-h-0 flex items-center justify-center p-2 overflow-hidden">
+          <canvas id="edCv" style="touch-action:none;max-width:100%;max-height:calc(100vh - 230px);background:#000"></canvas>
+        </div>
+        <div class="p-3 bg-slate-800 text-white space-y-2" style="padding-bottom:max(.75rem, env(safe-area-inset-bottom))">
+          <div class="grid grid-cols-6 gap-1.5">
+            <button data-t="arrow" class="tool on">↗️<br>سهم</button>
+            <button data-t="text" class="tool">🔤<br>نص</button>
+            <button data-t="crop" class="tool">✂️<br>قص</button>
+            <button id="edRot" class="tool">🔄<br>تدوير</button>
+            <button id="edUndo" class="tool">↩️<br>تراجع</button>
+            <button id="edClear" class="tool">🧹<br>مسح</button>
+          </div>
+          <div id="edHint" class="text-[11px] text-slate-300 text-center">اسحب على الصورة لرسم سهم يشير إلى البنية المهمة</div>
+          <label class="flex items-center gap-2 text-xs ${stampText ? '' : 'opacity-40'}">
+            <input id="edStamp" type="checkbox" class="w-4 h-4" ${stampText ? '' : 'disabled'}>
+            <span>كتابة التكبير والصبغة على الصورة ${stampText ? '(' + esc(stampText) + ')' : '(حدّد التكبير/الصبغة في النموذج أولاً)'}</span>
+          </label>
+        </div>
+      </div>`;
+
+      const cv = $('edCv'), ctx = cv.getContext('2d');
+      let base = null, ann = [], tool = 'arrow', tmp = null, cropRect = null, drag = false;
+      const hints = {
+        arrow: 'اسحب على الصورة لرسم سهم يشير إلى البنية المهمة',
+        text: 'اضغط على مكان التعليق ثم اكتب النص',
+        crop: 'اسحب لتحديد منطقة القص ثم اضغط «قص» مرة أخرى للتطبيق'
+      };
+
+      const img = new Image();
+      img.onload = () => {
+        base = document.createElement('canvas'); base.width = img.width; base.height = img.height;
+        base.getContext('2d').drawImage(img, 0, 0);
+        sizeCv(); draw();
+      };
+      img.src = src;
+
+      function sizeCv() { cv.width = base.width; cv.height = base.height; }
+      function fs() { return Math.max(24, Math.round(Math.max(base.width, base.height) / 28)); }
+      function lw() { return Math.max(3, Math.round(Math.max(base.width, base.height) / 220)); }
+
+      function drawArrow(a) {
+        const w = lw(), ang = Math.atan2(a.y2 - a.y1, a.x2 - a.x1), hl = w * 5;
+        const path = () => {
+          ctx.beginPath(); ctx.moveTo(a.x1, a.y1); ctx.lineTo(a.x2, a.y2);
+          ctx.moveTo(a.x2, a.y2); ctx.lineTo(a.x2 - hl * Math.cos(ang - 0.45), a.y2 - hl * Math.sin(ang - 0.45));
+          ctx.moveTo(a.x2, a.y2); ctx.lineTo(a.x2 - hl * Math.cos(ang + 0.45), a.y2 - hl * Math.sin(ang + 0.45));
+        };
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.lineWidth = w + 4; path(); ctx.stroke();
+        ctx.strokeStyle = '#facc15'; ctx.lineWidth = w; path(); ctx.stroke();
+      }
+      function drawText(a) {
+        const s = fs();
+        ctx.font = `800 ${s}px Cairo, sans-serif`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+        ctx.lineJoin = 'round'; ctx.lineWidth = s / 5; ctx.strokeStyle = 'rgba(0,0,0,.9)';
+        ctx.strokeText(a.text, a.x, a.y); ctx.fillStyle = '#facc15'; ctx.fillText(a.text, a.x, a.y);
+      }
+      function drawStamp() {
+        if (!$('edStamp').checked || !stampText) return;
+        const s = Math.round(fs() * 0.8);
+        ctx.font = `700 ${s}px Cairo, sans-serif`; ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        const pad = s * .45, tw = ctx.measureText(stampText).width;
+        const x = pad, y = base.height - pad;
+        ctx.fillStyle = 'rgba(15,23,42,.75)';
+        ctx.fillRect(x - pad / 2, y - s - pad / 2 + 4, tw + pad, s + pad);
+        ctx.fillStyle = '#fff'; ctx.fillText(stampText, x, y);
+        ctx.direction = 'inherit';
+      }
+      function draw(withUI = true) {
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(base, 0, 0);
+        ann.forEach(a => a.type === 'arrow' ? drawArrow(a) : drawText(a));
+        if (tmp) drawArrow(tmp);
+        drawStamp();
+        if (withUI && cropRect) {
+          const { x, y, w, h } = cropRect;
+          ctx.fillStyle = 'rgba(0,0,0,.55)';
+          ctx.fillRect(0, 0, cv.width, y); ctx.fillRect(0, y + h, cv.width, cv.height - y - h);
+          ctx.fillRect(0, y, x, h); ctx.fillRect(x + w, y, cv.width - x - w, h);
+          ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = lw(); ctx.strokeRect(x, y, w, h);
+        }
+      }
+      function pos(e) {
+        const r = cv.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height };
+      }
+
+      let start = null;
+      cv.addEventListener('pointerdown', (e) => {
+        if (!base) return;
+        cv.setPointerCapture(e.pointerId);
+        const p = pos(e); start = p; drag = true;
+        if (tool === 'text') {
+          drag = false;
+          const t = prompt('اكتب نص التعليق:');
+          if (t && t.trim()) { ann.push({ type: 'text', x: p.x, y: p.y, text: t.trim() }); draw(); }
+        }
+      });
+      cv.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const p = pos(e);
+        if (tool === 'arrow') { tmp = { x1: start.x, y1: start.y, x2: p.x, y2: p.y }; draw(); }
+        else if (tool === 'crop') {
+          const x = Math.max(0, Math.min(start.x, p.x)), y = Math.max(0, Math.min(start.y, p.y));
+          const x2 = Math.min(cv.width, Math.max(start.x, p.x)), y2 = Math.min(cv.height, Math.max(start.y, p.y));
+          cropRect = { x, y, w: x2 - x, h: y2 - y }; draw();
+        }
+      });
+      const endDrag = () => {
+        if (!drag) return; drag = false;
+        if (tool === 'arrow' && tmp) {
+          if (Math.hypot(tmp.x2 - tmp.x1, tmp.y2 - tmp.y1) > 12) ann.push({ type: 'arrow', ...tmp });
+          tmp = null; draw();
+        }
+      };
+      cv.addEventListener('pointerup', endDrag);
+      cv.addEventListener('pointercancel', endDrag);
+
+      function applyCrop() {
+        if (!cropRect || cropRect.w < 20 || cropRect.h < 20) { cropRect = null; draw(); return; }
+        const { x, y, w, h } = cropRect;
+        const nb = document.createElement('canvas'); nb.width = Math.round(w); nb.height = Math.round(h);
+        nb.getContext('2d').drawImage(base, x, y, w, h, 0, 0, nb.width, nb.height);
+        ann = ann.map(a => a.type === 'arrow'
+          ? { ...a, x1: a.x1 - x, y1: a.y1 - y, x2: a.x2 - x, y2: a.y2 - y }
+          : { ...a, x: a.x - x, y: a.y - y });
+        base = nb; cropRect = null; sizeCv(); draw();
+      }
+
+      document.querySelectorAll('#editorRoot [data-t]').forEach(b => b.addEventListener('click', () => {
+        const next = b.dataset.t;
+        if (tool === 'crop' && next === 'crop' && cropRect) { applyCrop(); return; }
+        tool = next; cropRect = null;
+        document.querySelectorAll('#editorRoot [data-t]').forEach(x => x.classList.toggle('on', x === b));
+        $('edHint').textContent = hints[tool]; draw();
+      }));
+      $('edRot').onclick = () => {
+        const H = base.height;
+        const nb = document.createElement('canvas'); nb.width = base.height; nb.height = base.width;
+        const c = nb.getContext('2d'); c.translate(H, 0); c.rotate(Math.PI / 2); c.drawImage(base, 0, 0);
+        ann = ann.map(a => a.type === 'arrow'
+          ? { ...a, x1: H - a.y1, y1: a.x1, x2: H - a.y2, y2: a.x2 }
+          : { ...a, x: H - a.y, y: a.x });
+        base = nb; cropRect = null; sizeCv(); draw();
+      };
+      $('edUndo').onclick = () => { ann.pop(); draw(); };
+      $('edClear').onclick = () => { ann = []; draw(); };
+      $('edStamp').onchange = () => draw();
+      const close = (v) => { root.innerHTML = ''; resolve(v); };
+      $('edCancel').onclick = () => close(null);
+      $('edDone').onclick = () => { cropRect = null; draw(false); close(cv.toDataURL('image/jpeg', 0.88)); };
+    });
+  }
+
+  /* ================= Form ================= */
+  function resetForm() {
+    $('form').reset(); setImage(null); editingId = null;
+    $('date').value = todayISO();
+    $('formTitle').textContent = '➕ إضافة عينة جديدة';
+    $('saveBtn').textContent = '💾 حفظ السجل';
+    $('cancelEdit').classList.add('hidden');
+  }
+  $('cancelEdit').addEventListener('click', () => { resetForm(); toast('تم إلغاء التعديل'); });
+
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const prev = records.find(r => r.id === editingId);
+    const rec = {
+      id: editingId || ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+      pid: $('pid').value.trim(),
+      gender: $('gender').value,
+      age: $('age').value,
+      sample: $('sample').value,
+      diag: $('diag').value,
+      organism: $('organism').value.trim(),
+      mag: $('mag').value,
+      stain: $('stain').value,
+      date: $('date').value || todayISO(),
+      tags: parseTags($('tags').value),
+      comment: $('comment').value.trim(),
+      sign: $('sign').value.trim(),
+      img: imgData,
+      createdAt: prev ? prev.createdAt : Date.now()
+    };
+    try {
+      await dbPut(rec);
+    } catch (err) { toast('⚠️ تعذر الحفظ — قد تكون مساحة الجهاز ممتلئة'); return; }
+    if (prev) records = records.map(r => r.id === rec.id ? rec : r); else records.push(rec);
+    const wasEdit = !!prev;
+    resetForm(); updateStats();
+    toast(wasEdit ? '✅ تم تحديث السجل' : '✅ تم حفظ السجل');
+    if (wasEdit) showTab('list');
+  });
+
+  function editRecord(id) {
+    const r = records.find(x => x.id === id); if (!r) return;
+    editingId = id;
+    $('pid').value = r.pid; $('gender').value = r.gender; $('age').value = r.age;
+    $('sample').value = r.sample; $('diag').value = r.diag;
+    $('organism').value = r.organism || ''; $('mag').value = r.mag || ''; $('stain').value = r.stain || '';
+    $('date').value = r.date || todayISO(); $('tags').value = (r.tags || []).join(', ');
+    $('comment').value = r.comment || ''; $('sign').value = r.sign;
+    setImage(r.img || null);
+    $('formTitle').textContent = '✏️ تعديل السجل';
+    $('saveBtn').textContent = '💾 حفظ التعديلات';
+    $('cancelEdit').classList.remove('hidden');
+    showTab('add');
+  }
+  function deleteRecord(id) {
+    confirmBox('هل أنت متأكد من حذف هذا السجل نهائياً؟', 'حذف', async () => {
+      try { await dbDel(id); } catch (e) { return toast('تعذر الحذف'); }
+      records = records.filter(r => r.id !== id);
+      updateStats(); renderList(); toast('🗑️ تم الحذف');
+    });
+  }
+
+  /* ================= Share (anonymous: no patient ID) ================= */
+  async function shareRecord(id) {
+    const r = records.find(x => x.id === id); if (!r) return;
+    const lines = [
+      `🔬 Clinical Atlas`,
+      `${sLabel(r.sample)} • ${dLabel(r.diag)}`,
+      r.organism ? `الكائن/التشخيص: ${r.organism}` : '',
+      `${r.gender} • ${r.age} سنة`,
+      [r.mag, r.stain].filter(Boolean).length ? `التكبير/الصبغة: ${[r.mag, r.stain].filter(Boolean).join(' • ')}` : '',
+      r.comment ? `ملاحظات: ${r.comment}` : '',
+      `✍️ ${r.sign}`
+    ].filter(Boolean).join('\n');
+    try {
+      if (r.img) {
+        const blob = await (await fetch(r.img)).blob();
+        const file = new File([blob], 'sample.jpg', { type: 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Clinical Atlas', text: lines }); return;
+        }
+      }
+      if (navigator.share) { await navigator.share({ title: 'Clinical Atlas', text: lines }); return; }
+      await navigator.clipboard.writeText(lines); toast('تم نسخ ملخص الحالة (بدون رقم المريض)');
+    } catch (e) { if (e && e.name !== 'AbortError') toast('تعذرت المشاركة'); }
+  }
+
+  /* ================= List ================= */
+  function getFiltered() {
+    const q = $('q').value.trim().toLowerCase();
+    const fs = $('fSample').value, fd = $('fDiag').value;
+    return records.filter(r => {
+      if (fs && r.sample !== fs) return false;
+      if (fd && r.diag !== fd) return false;
+      if (!q) return true;
+      return [r.pid, r.comment, r.sign, r.sample, r.diag, SAMPLE_AR[r.sample], DIAG_AR[r.diag], r.gender, r.age, r.organism, r.stain, r.mag, (r.tags || []).join(' ')]
+        .join(' ').toLowerCase().includes(q);
+    }).sort((a, b) => b.createdAt - a.createdAt);
+  }
+  function renderList() {
+    const list = getFiltered();
+    $('resultInfo').textContent = `عرض ${list.length} من ${records.length}`;
+    $('emptyState').classList.toggle('hidden', list.length > 0);
+    $('cards').innerHTML = list.map(r => `
+      <article class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="flex gap-3 p-3">
+          <button data-view="${r.id}" class="shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center">
+            ${r.img ? `<img src="${r.img}" class="w-full h-full object-cover" alt="" loading="lazy">` : '<span class="text-3xl opacity-40">🔬</span>'}
+          </button>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="font-extrabold text-brand-900 truncate" dir="ltr">#${esc(r.pid)}</h3>
+              <span class="text-[10px] text-slate-400 shrink-0">${esc(fmtDate(r.date))}</span>
+            </div>
+            ${r.organism ? `<div class="text-xs italic text-slate-600 truncate" dir="ltr" style="text-align:right">${esc(r.organism)}</div>` : ''}
+            <div class="flex flex-wrap gap-1 mt-1">
+              <span class="text-[11px] font-bold bg-brand-100 text-brand-700 rounded-full px-2 py-0.5">${esc(r.sample)}</span>
+              <span class="text-[11px] font-bold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">${esc(r.diag)}</span>
+              <span class="text-[11px] font-bold bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">${esc(r.gender)} • ${esc(r.age)} سنة</span>
+              ${r.mag ? `<span class="text-[11px] font-bold bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">${esc(r.mag)}</span>` : ''}
+              ${r.stain ? `<span class="text-[11px] font-bold bg-purple-100 text-purple-700 rounded-full px-2 py-0.5">${esc(r.stain)}</span>` : ''}
+            </div>
+            ${(r.tags || []).length ? `<div class="text-[11px] text-brand-600 mt-1 truncate">${r.tags.map(t => '#' + esc(t)).join(' ')}</div>` : ''}
+            ${r.comment ? `<p class="text-xs text-slate-500 mt-1 line-clamp-2">${esc(r.comment)}</p>` : ''}
+          </div>
+        </div>
+        <div class="flex items-center justify-between bg-slate-50 border-t border-slate-100 px-3 py-2">
+          <div class="text-xs text-slate-500 truncate">✍️ <span class="sig text-base text-brand-900">${esc(r.sign)}</span></div>
+          <div class="flex gap-1.5 shrink-0">
+            <button data-share="${r.id}" class="text-xs font-bold bg-emerald-100 text-emerald-700 rounded-lg px-2.5 py-1.5">مشاركة</button>
+            <button data-edit="${r.id}" class="text-xs font-bold bg-brand-100 text-brand-700 rounded-lg px-2.5 py-1.5">تعديل</button>
+            <button data-del="${r.id}" class="text-xs font-bold bg-rose-100 text-rose-700 rounded-lg px-2.5 py-1.5">حذف</button>
+          </div>
+        </div>
+      </article>`).join('');
+  }
+  $('cards').addEventListener('click', (e) => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.edit) editRecord(t.dataset.edit);
+    else if (t.dataset.del) deleteRecord(t.dataset.del);
+    else if (t.dataset.share) shareRecord(t.dataset.share);
+    else if (t.dataset.view) { const r = records.find(x => x.id === t.dataset.view); if (r && r.img) viewImage(r.img); }
+  });
+  ['q','fSample','fDiag'].forEach(id => $(id).addEventListener('input', renderList));
+  $('clearFilters').addEventListener('click', () => { $('q').value = ''; $('fSample').value = ''; $('fDiag').value = ''; renderList(); });
+  function updateStats() { $('statCount').textContent = records.length; }
+
+  /* ================= Booklet settings / logo ================= */
+  function applySettingsToUI() {
+    $('bkTitle').value = settings.title; $('bkInst').value = settings.inst;
+    $('bkGroup').value = settings.group; $('bkLayout').value = settings.layout;
+    $('bkAnon').checked = !!settings.anon; renderLogo();
+  }
+  function renderLogo() {
+    $('logoBox').innerHTML = settings.logo ? `<img src="${settings.logo}" class="w-full h-full object-contain" alt="">` : '🏛️';
+  }
+  [['bkTitle','title'],['bkInst','inst'],['bkGroup','group'],['bkLayout','layout']].forEach(([id, k]) =>
+    $(id).addEventListener('change', () => { settings[k] = $(id).value; saveSettings(); }));
+  $('bkAnon').addEventListener('change', () => { settings.anon = $('bkAnon').checked; saveSettings(); });
+  $('logoIn').addEventListener('change', (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        const r = Math.min(1, 500 / Math.max(im.width, im.height));
+        const c = document.createElement('canvas'); c.width = Math.round(im.width * r); c.height = Math.round(im.height * r);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        settings.logo = c.toDataURL('image/png'); saveSettings(); renderLogo(); toast('تم حفظ الشعار');
+      };
+      im.src = rd.result;
+    };
+    rd.readAsDataURL(f);
+  });
+  $('logoDel').addEventListener('click', () => { settings.logo = null; saveSettings(); renderLogo(); });
+
+  async function showStorage() {
+    let txt = `السجلات المحفوظة: ${records.length}`;
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        const { usage, quota } = await navigator.storage.estimate();
+        txt += ` • المساحة المستخدمة: ${(usage / 1048576).toFixed(1)} MB من ~${Math.round(quota / 1048576)} MB`;
+      }
+      if (navigator.storage && navigator.storage.persisted) {
+        const p = await navigator.storage.persisted();
+        txt += p ? ' • التخزين محمي من الحذف التلقائي ✅' : ' • التخزين غير محمي — نزّل نسخة احتياطية دورياً';
+      }
+    } catch (e) {}
+    $('storageInfo').textContent = txt;
+  }
+
+  /* ================= Booklet build ================= */
+  function buildBooklet() {
+    const title = settings.title.trim() || 'أطلس العينات المجهرية';
+    const inst = settings.inst.trim();
+    const mode = settings.group; // sample | diag
+    const per = settings.layout === '4' ? 4 : 1;
+    const anon = !!settings.anon;
+    const data = $('bkFiltered').checked ? getFiltered().slice().reverse() : records.slice();
+    if (!data.length) { toast('لا توجد سجلات للتصدير'); return false; }
+
+    const order = mode === 'sample' ? SAMPLES : DIAGS;
+    const lab = mode === 'sample' ? sLabel : dLabel;
+    const groups = order.map(k => ({ key: k, items: data.filter(r => r[mode] === k).sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.createdAt - b.createdAt) }))
+                        .filter(g => g.items.length);
+
+    // case codes assigned in booklet order
+    let n = 0; const code = new Map();
+    groups.forEach(g => g.items.forEach(r => code.set(r.id, 'C-' + String(++n).padStart(3, '0'))));
+
+    const pagesOf = (g) => Math.ceil(g.items.length / per);
+    const totalPages = 2 + groups.reduce((s, g) => s + pagesOf(g), 0) + 1;
+    let pageNo = 0;
+    const foot = () => { pageNo++; return `<div class="bk-foot"><span>${esc(title)}${inst ? ' — ' + esc(inst) : ''}</span><span>صفحة ${pageNo} / ${totalPages}</span></div>`; };
+    const idCell = (r) => anon ? esc(code.get(r.id)) : `<span dir="ltr">${esc(r.pid)}</span> <span style="color:#64748b">(${esc(code.get(r.id))})</span>`;
+    const today = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+    const msDetail = (r) => [r.mag, r.stain].filter(Boolean).join(' • ') || '—';
+
+    let html = '';
+    // Cover
+    pageNo++;
+    html += `<section class="bk-page bk-cover">
+      ${settings.logo ? `<div class="bk-logo"><img src="${settings.logo}" alt=""></div>` : '<div class="bk-ring">🔬</div>'}
+      <h1>${esc(title)}</h1>
+      <div class="en">CLINICAL ATLAS</div>
+      ${inst ? `<div class="inst">${esc(inst)}</div>` : ''}
+      <div class="meta">عدد الحالات: ${data.length} &nbsp;•&nbsp; ${today}</div>
+    </section>`;
+
+    // TOC
+    let startPage = 3;
+    const tocRows = groups.map(g => {
+      const row = `<div class="row"><b>${esc(lab(g.key))}</b><span class="dots"></span><span>${g.items.length} حالة</span><span style="min-width:14mm;text-align:left;color:#1d4ed8;font-weight:700">ص ${startPage}</span></div>`;
+      startPage += pagesOf(g); return row;
+    }).join('');
+    html += `<section class="bk-page bk-toc">
+      <div class="bk-head"><span>${esc(title)}</span><span>الفهرس</span></div>
+      <h2>الفهرس</h2>${tocRows}
+      <div class="row" style="margin-top:2mm"><b>ملخص إحصائي</b><span class="dots"></span><span style="min-width:14mm;text-align:left;color:#1d4ed8;font-weight:700">ص ${totalPages}</span></div>
+      ${foot()}
+    </section>`;
+
+    // Cases
+    groups.forEach(g => {
+      if (per === 1) {
+        g.items.forEach(r => {
+          html += `<section class="bk-page">
+            <div class="bk-head"><span>${esc(title)}</span><span>${esc(lab(g.key))}</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5mm">
+              <span class="bk-chapter">${esc(lab(g.key))}</span>
+              <span style="font-weight:800;color:#1e3a8a;font-size:12pt">حالة ${esc(code.get(r.id))}</span>
+            </div>
+            <div class="bk-img">${r.img ? `<img src="${r.img}" alt="">` : '<span class="bk-noimg">لا توجد صورة</span>'}</div>
+            <table class="bk-table">
+              <tr><td class="k">${anon ? 'رمز الحالة' : 'رقم المريض'}</td><td>${idCell(r)}</td><td class="k">الجنس / العمر</td><td>${esc(r.gender)} / ${esc(r.age)} سنة</td></tr>
+              <tr><td class="k">نوع العينة</td><td>${esc(sLabel(r.sample))}</td><td class="k">التشخيص</td><td>${esc(dLabel(r.diag))}</td></tr>
+              <tr><td class="k">الكائن / التشخيص النهائي</td><td dir="ltr" style="text-align:right;font-style:italic">${esc(r.organism) || '—'}</td><td class="k">التكبير / الصبغة</td><td dir="ltr" style="text-align:right">${esc(msDetail(r))}</td></tr>
+              <tr><td class="k">تاريخ الفحص</td><td colspan="3">${esc(fmtDate(r.date))}</td></tr>
+            </table>
+            <div class="bk-comment"><b style="color:#1e3a8a">التعليق السريري:</b><br>${r.comment ? esc(r.comment).replace(/\n/g, '<br>') : '<span style="color:#94a3b8">—</span>'}</div>
+            ${(r.tags || []).length ? `<div class="bk-tags">${r.tags.map(t => '#' + esc(t)).join('  ')}</div>` : ''}
+            <div class="bk-sign"><div class="box"><div class="name">${esc(r.sign)}</div><div class="cap">توقيع الفاحص / صاحب الصورة</div></div></div>
+            ${foot()}
+          </section>`;
+        });
+      } else {
+        for (let i = 0; i < g.items.length; i += 4) {
+          const chunk = g.items.slice(i, i + 4);
+          html += `<section class="bk-page">
+            <div class="bk-head"><span>${esc(title)}</span><span>${esc(lab(g.key))}</span></div>
+            <div class="bk-grid">${chunk.map(r => `
+              <div class="bk-cell">
+                <div class="ct"><b>${esc(code.get(r.id))}</b><span>${esc(r.sample)} • ${esc(r.diag)}</span></div>
+                <div class="ci">${r.img ? `<img src="${r.img}" alt="">` : '<span class="bk-noimg">لا توجد صورة</span>'}</div>
+                <div class="cf">
+                  ${anon ? '' : `<b dir="ltr">${esc(r.pid)}</b> • `}${esc(r.gender)} / ${esc(r.age)} سنة • ${esc(fmtDate(r.date))}<br>
+                  ${r.organism ? `<i dir="ltr">${esc(r.organism)}</i><br>` : ''}
+                  ${msDetail(r) !== '—' ? `<span dir="ltr">${esc(msDetail(r))}</span><br>` : ''}
+                  ${r.comment ? `<div class="cm">${esc(r.comment)}</div>` : ''}
+                </div>
+                <div class="cs">${esc(r.sign)}</div>
+              </div>`).join('')}
+            </div>
+            ${foot()}
+          </section>`;
+        }
+      }
+    });
+
+    // Summary
+    const count = (arr, key) => arr.map(k => [k, data.filter(r => r[key] === k).length]).filter(x => x[1]);
+    const signers = {}; data.forEach(r => signers[r.sign] = (signers[r.sign] || 0) + 1);
+    const tbl = (rows, lf) => `<table><tr><th>البند</th><th style="width:25mm">العدد</th></tr>${rows.map(([k, v]) => `<tr><td>${esc(lf ? lf(k) : k)}</td><td>${v}</td></tr>`).join('')}</table>`;
+    html += `<section class="bk-page bk-sum">
+      <div class="bk-head"><span>${esc(title)}</span><span>ملخص إحصائي</span></div>
+      <h2>ملخص إحصائي</h2>
+      <h3>حسب نوع العينة</h3>${tbl(count(SAMPLES, 'sample'), sLabel)}
+      <h3>حسب الفئة التشخيصية</h3>${tbl(count(DIAGS, 'diag'), dLabel)}
+      <h3>الفاحصون / أصحاب الصور</h3>${tbl(Object.entries(signers))}
+      <div style="font-weight:800;color:#1e3a8a;margin-top:2mm">إجمالي الحالات: ${data.length}</div>
+      ${foot()}
+    </section>`;
+
+    $('printArea').innerHTML = html;
+    return true;
+  }
+  $('exportBtn').addEventListener('click', () => {
+    if (!buildBooklet()) return;
+    toast('جاري تجهيز الكتيب… اختر «حفظ كـ PDF»');
+    const imgs = Array.from($('printArea').querySelectorAll('img'));
+    const ready = Promise.all(imgs.map(i => i.complete ? 1 : new Promise(r => { i.onload = i.onerror = r; })));
+    const fonts = document.fonts ? document.fonts.ready : Promise.resolve();
+    Promise.all([ready, fonts]).then(() => setTimeout(() => window.print(), 400));
+  });
+
+  /* ================= Backup / Restore ================= */
+  $('backupBtn').addEventListener('click', () => {
+    if (!records.length) return toast('لا توجد بيانات للنسخ');
+    const blob = new Blob([JSON.stringify(records)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'clinical-atlas-backup-' + todayISO() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  });
+  $('restoreIn').addEventListener('change', (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = async () => {
+      try {
+        const arr = JSON.parse(rd.result);
+        if (!Array.isArray(arr)) throw 0;
+        const ids = new Set(records.map(r => r.id));
+        const add = arr.filter(r => r && r.id && !ids.has(r.id));
+        for (const r of add) { await dbPut(r); records.push(r); }
+        updateStats(); renderList(); showStorage(); toast(`✅ تمت استعادة ${add.length} سجل`);
+      } catch (err) { toast('ملف غير صالح أو المساحة غير كافية'); }
+    };
+    rd.readAsText(f);
+  });
+
+  /* ================= Init ================= */
+  (async function init() {
+    fillSelects(); $('date').value = todayISO();
+    try {
+      db = await openDB();
+      await migrateOld();
+      records = await dbAll();
+      (await setAll()).forEach(s => { settings[s.k] = s.v; });
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    } catch (e) {
+      toast('⚠️ تعذر فتح قاعدة البيانات المحلية — قد يكون المتصفح في وضع التصفح الخاص');
+    }
+    applySettingsToUI(); updateStats(); renderList();
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  })();
+})();
+</script>
+</body>
+</html>
